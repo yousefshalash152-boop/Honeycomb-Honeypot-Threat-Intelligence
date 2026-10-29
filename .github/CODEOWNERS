@@ -1,0 +1,28 @@
+# Each folder is reviewed by the OWNER'S fixed reviewer (see the stage plan).
+
+# Member 1 (infra)            -> reviewed by member 6
+/infra/                       @fatmay-15
+/scripts/pull_logs.sh         @fatmay-15
+
+# Member 2 (data + e2e)       -> reviewed by member 4
+/honeycomb/src/storage/       @ebrahimhany66
+/scripts/stage_gate.py        @ebrahimhany66
+/tests/test_pipeline_e2e.py   @ebrahimhany66
+/tests/golden/                @ebrahimhany66
+
+# Member 3 (threat intel)     -> reviewed by member 5
+/honeycomb/src/analysis/      @yousefshalash152-boop
+
+# Member 4 (behavior + correlation) -> reviewed by member 3
+/honeycomb/src/correlation.py  @Yousef-Khalifa1
+/honeycomb/src/campaigns_db.py @Yousef-Khalifa1
+/honeycomb/src/behavior.py     @Yousef-Khalifa1
+/tests/fixtures/scenarios/     @Yousef-Khalifa1
+
+# Member 5 (scoring, CI, config) -> reviewed by member 1
+/config/                      @AbdelrahmanQasem1
+/.github/                     @AbdelrahmanQasem1
+/honeycomb/__main__.py        @AbdelrahmanQasem1
+
+# Member 6 (Wazuh)            -> reviewed by member 2
+/wazuh/                       @saidiprahimsaid-alt

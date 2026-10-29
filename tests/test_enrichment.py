@@ -1,7 +1,8 @@
+
 from honeycomb.src.analysis import enrichment
 
+def test_enriches_ip_with_abuseipdb_only(monkeypatch):
 
-def test_enriches_ip_with_both_services(monkeypatch):
     monkeypatch.setattr(
         enrichment,
         "extract_iocs",
@@ -17,12 +18,16 @@ def test_enriches_ip_with_both_services(monkeypatch):
     monkeypatch.setattr(
         enrichment,
         "check_ip_abuseipdb",
-        lambda value: {"source": "AbuseIPDB", "score": 0},
+        lambda value, db_path=None: {
+            "source": "AbuseIPDB",
+            "score": 0,
+        },
     )
+
     monkeypatch.setattr(
         enrichment,
         "check_virustotal",
-        lambda ioc_type, value: {
+        lambda ioc_type, value, db_path=None: {
             "source": "VirusTotal",
             "ioc_type": ioc_type,
         },
@@ -33,8 +38,7 @@ def test_enriches_ip_with_both_services(monkeypatch):
     assert len(results) == 1
     assert results[0]["event_ids"] == ["event-1"]
     assert "abuseipdb" in results[0]["threat_intel"]
-    assert "virustotal" in results[0]["threat_intel"]
-
+    assert "virustotal" not in results[0]["threat_intel"]
 
 def test_enriches_sha256_with_virustotal_only(monkeypatch):
     monkeypatch.setattr(
@@ -52,7 +56,7 @@ def test_enriches_sha256_with_virustotal_only(monkeypatch):
     monkeypatch.setattr(
         enrichment,
         "check_virustotal",
-        lambda ioc_type, value: {
+        lambda ioc_type, value, db_path=None: {
             "source": "VirusTotal",
             "ioc_type": ioc_type,
         },
