@@ -60,3 +60,21 @@ Each campaign stores: the rules that matched, the session list, and a confidence
 - B05: `cat /etc/passwd` is enough alone (S1 expects it); `w`/`who`/`last` need 2 commands
 - B02: counts only a successful login with a default pair (a failed admin/admin in S6 must not fire it)
 - B03: counts only when B01 fired in the same session
+
+## Log event that proves each rule
+| Rule | Event in the Cowrie log |
+| --- | --- |
+| B01 | `cowrie.login.failed` |
+| B02 | `cowrie.login.success` |
+| B03 | `cowrie.login.failed` then `cowrie.login.success` |
+| B04-B07 | `cowrie.command.input` |
+| B08 | `cowrie.command.input` or `cowrie.session.file_download` |
+| B09-B15 | `cowrie.command.input` |
+
+## Fact vs inference
+| Fact (in the log) | Inference (our conclusion) |
+| --- | --- |
+| 5 or more `login.failed` in one session | Automated password guessing (B01) |
+| `login.success` after failures | The attacker got past the trap's login (B03), not that the password was valid |
+| `session.file_download` with a SHA-256 | A tool was downloaded (B08) |
+| Same SHA-256 in two sessions | A suspected campaign, not "the same attacker" |
