@@ -13,10 +13,11 @@ CONFIG_PATH = ROOT / "config" / "scoring.yaml"
 WHITELIST_PATH = ROOT / "config" / "whitelist.yaml"
 
 # Behavior rule (docs/attack-mapping.md) -> evidence type (config/scoring.yaml).
-# B09 (execution), B13 (hide traces), B14 and B15 have no weight yet.
+# B02 = successful login with a default pair, B03 = login after guessing.
+# B09 (execution), B13/B14 (evasion) and B15 (port scan) have no weight yet.
 BEHAVIOR_TO_EVIDENCE = {
-    "B01": "login_brute_force", "B02": "login_brute_force",
-    "B03": "login_success",
+    "B01": "login_brute_force",
+    "B02": "login_success", "B03": "login_success",
     "B04": "recon_commands", "B05": "recon_commands",
     "B06": "recon_commands", "B07": "recon_commands",
     "B08": "file_download",

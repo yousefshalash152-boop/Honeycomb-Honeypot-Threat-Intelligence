@@ -52,8 +52,13 @@ def test_no_behavior_scores_0():
 
 
 def test_each_evidence_type_counts_once():
-    r = score_ip("1.1.1.1", {"B01", "B02", "B04", "B05", "B06"}, whitelist=[])
-    assert r["score"] == 30  # 20 (B01+B02 once) + 10 (B04+B05+B06 once)
+    r = score_ip("1.1.1.1", {"B01", "B04", "B05", "B06"}, whitelist=[])
+    assert r["score"] == 30  # 20 brute force + 10 (B04+B05+B06 count once)
+
+
+def test_login_rules_b02_and_b03_count_once():
+    r = score_ip("1.1.1.1", {"B02", "B03"}, whitelist=[])
+    assert r["score"] == 20  # login_success once
 
 
 def test_reputation_adds_points_and_unknown_adds_nothing():
