@@ -3,6 +3,7 @@
     python -m honeycomb run                              (steps listed, none run)
     python -m honeycomb run --input LOG.jsonl --db X.db  (steps 3-8 on real data)
     python -m honeycomb verify 203.0.113.45              (is this IP really blocked?)
+    python -m honeycomb approve 203.0.113.45 --by NAME --reason "TEXT" --db X.db
 """
 import argparse
 import os
@@ -45,11 +46,31 @@ def _verify(args) -> int:
     return 0
 
 
+def _approve(args) -> int:
+    from honeycomb.src.decisions import ApproveRefused, approve
+    if not args.ip:
+        print('approve needs an IP:  python -m honeycomb approve <IP> --by NAME --reason "TEXT"')
+        return 2
+    try:
+        d = approve(args.db, args.ip, args.by, args.reason, enrich=not args.no_enrich,
+                    host=args.host, key=args.key, user=args.user, port=args.port)
+    except ApproveRefused as exc:
+        print(exc)
+        return 1
+    print(f"APPROVED {d['ip']}  score={d['score']}  by={d['approved_by']}  "
+          f"decision={d['decision_id']}")
+    print(f"  reason: {d['reason']}")
+    print(f"  block:  {d['block_result']}")
+    return 0 if d["block_result"] == "blocked" else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="honeycomb")
-    parser.add_argument("command", choices=["run", "verify"],
-                        help="run the pipeline, or verify that an IP is blocked")
+    parser.add_argument("command", choices=["run", "verify", "approve"],
+                        help="run the pipeline, verify a block, or approve a block")
     parser.add_argument("ip", nargs="?", help="IP to check (verify only)")
+    parser.add_argument("--by", help="approver's name (approve only, required)")
+    parser.add_argument("--reason", help="why the block is approved (approve only, required)")
     parser.add_argument("--input", help="Cowrie JSON-lines log file to process")
     parser.add_argument("--db", default="data/honeycomb.db",
                         help="SQLite database path (default: data/honeycomb.db)")
@@ -67,6 +88,8 @@ def main() -> int:
 
     if args.command == "verify":
         return _verify(args)
+    if args.command == "approve":
+        return _approve(args)
 
     if not args.input:
         for number, step in enumerate(STEPS, start=3):
