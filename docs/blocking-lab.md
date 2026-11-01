@@ -88,3 +88,7 @@ docker network rm honeycomb-lab-attacker
 
 - Never put your own IP or a teammate's IP in the set.
 - This is the lab only. The real block on Azure is a later task.
+
+## Newer version
+
+The manual steps above use a single published port and `--dport 2222`. For the two-port lab, the Azure-ready rule (`--ctorigdstport`), the restricted key and `honeycomb verify`, use `scripts/lab.sh` and follow `docs/blocking.md`.
