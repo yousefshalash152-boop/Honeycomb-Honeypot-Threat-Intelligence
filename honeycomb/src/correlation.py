@@ -66,3 +66,55 @@ def find_campaigns(sessions: list[dict]) -> list[dict]:
             "ips": sorted(ips),
         })
     return campaigns
+
+
+CONF_ORDER = {"medium": 1, "high": 2}
+
+
+def merge_campaigns(links: list[dict]) -> list[dict]:
+    """Merge links that share a session into one campaign each.
+
+    Input: the output of find_campaigns (one entry per rule+evidence).
+    Output: one dict per merged campaign, with all its reasons.
+    """
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)  # smallest id is the root: stable
+
+    for link in links:
+        first = link["sessions"][0]
+        for sid in link["sessions"][1:]:
+            union(first, sid)
+
+    groups = defaultdict(list)
+    for link in links:
+        groups[find(link["sessions"][0])].append(link)
+
+    merged = []
+    for root, group in sorted(groups.items()):
+        sessions = sorted({s for l in group for s in l["sessions"]})
+        ips = sorted({ip for l in group for ip in l["ips"]})
+        rules = sorted({l["rule"] for l in group})
+        confidence = max((l["confidence"] for l in group), key=CONF_ORDER.get)
+        if len(rules) >= 2 and confidence == "high":
+            confidence = "very_high"
+        merged.append({
+            "root_session": root,
+            "rules": rules,
+            "confidence": confidence,
+            "evidence": [l["evidence"] for l in group],
+            "reasons": [l["reason"] for l in group],
+            "sessions": sessions,
+            "ips": ips,
+        })
+    return merged
