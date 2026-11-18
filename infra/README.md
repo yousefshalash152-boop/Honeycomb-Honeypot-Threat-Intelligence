@@ -108,3 +108,19 @@ jq -c '{eventid, session, input}' data/raw/cowrie-*.json | head
 ```
 
 For a real VM: `scripts/pull_logs.sh <VM_IP> <ADMIN_PORT> <ADMIN_USER>`.
+
+## 9. Hourly log pull (cron)
+
+Pull the Cowrie log into `data/raw/` automatically every hour (Linux). `data/` is gitignored.
+
+```bash
+sudo systemctl enable --now cron
+( crontab -l 2>/dev/null; echo "0 * * * * $HOME/honeycomb-test/scripts/pull_logs.sh local >> $HOME/honeycomb-test/data/pull.log 2>&1" ) | crontab -
+crontab -l
+```
+
+For the real VM replace `local` with `<VM_IP> <ADMIN_PORT> <ADMIN_USER>` (needs an SSH key without passphrase, since cron has no agent).
+
+Check: `ls data/raw/` and `tail data/pull.log`. To test quickly, change `0 * * * *` to `* * * * *` (every minute), then change it back.
+
+Remove: `crontab -l | grep -v pull_logs.sh | crontab -`

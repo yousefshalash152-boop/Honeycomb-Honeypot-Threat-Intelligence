@@ -26,3 +26,7 @@
 
 # Member 6 (Wazuh)            -> reviewed by member 2
 /wazuh/                       @saidiprahimsaid-alt
+
+# Member 5 scorer -> reviewed by member 1
+/honeycomb/src/scoring.py      @AbdelrahmanQasem1
+/tests/test_scoring.py        @AbdelrahmanQasem1
