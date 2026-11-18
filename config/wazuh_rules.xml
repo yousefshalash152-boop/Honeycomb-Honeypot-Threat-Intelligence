@@ -1,0 +1,41 @@
+<!-- Honeycomb Cowrie Honeypot Detection Rules for Wazuh SIEM -->
+<!-- Author: Member 2 (Data & SIEM) -->
+<group name="honeycomb,cowrie,">
+
+  <!-- Rule 1: Failed SSH/Telnet Login Attempt -->
+  <rule id="100101" level="5">
+    <field name="eventid">^cowrie.login.failed$</field>
+    <description>Honeycomb Cowrie: Failed SSH/Telnet login attempt</description>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- Rule 2: Successful Honeypot Infiltration -->
+  <rule id="100102" level="8">
+    <field name="eventid">^cowrie.login.success$</field>
+    <description>Honeycomb Cowrie: Successful login to honeypot</description>
+    <mitre>
+      <id>T1078</id>
+    </mitre>
+  </rule>
+
+  <!-- Rule 3: Command Execution by Attacker -->
+  <rule id="100103" level="7">
+    <field name="eventid">^cowrie.command.input$</field>
+    <description>Honeycomb Cowrie: Attacker command executed</description>
+    <mitre>
+      <id>T1059</id>
+    </mitre>
+  </rule>
+
+  <!-- Rule 4: Malicious File/Payload Download -->
+  <rule id="100104" level="10">
+    <field name="eventid">^cowrie.session.file_download$</field>
+    <description>Honeycomb Cowrie: Suspicious payload downloaded</description>
+    <mitre>
+      <id>T1204.002</id>
+    </mitre>
+  </rule>
+
+</group>
