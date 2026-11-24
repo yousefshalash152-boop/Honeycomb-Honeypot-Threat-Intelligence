@@ -8,7 +8,7 @@ The campaigns tables below are a PROPOSAL: agree on them with Member 2
 import hashlib
 from collections import OrderedDict
 
-from honeycomb.src.correlation import find_campaigns
+from honeycomb.src.correlation import find_campaigns, merge_campaigns
 
 CAMPAIGNS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS campaigns (
@@ -56,19 +56,23 @@ def _campaign_id(rule, evidence):
 
 
 def build_campaigns(conn):
-    """Full rebuild: running it twice gives the same rows (no duplicates)."""
+    """Full rebuild: running it twice gives the same rows (no duplicates).
+
+    One row per MERGED campaign (sessions linked by any rule are one campaign).
+    """
     init_campaigns(conn)
     sessions = load_sessions(conn)
     ip_of = {s["session_id"]: s["src_ip"] for s in sessions}
-    found = find_campaigns(sessions)
+    merged = merge_campaigns(find_campaigns(sessions))
     with conn:
         conn.execute("DELETE FROM campaign_sessions")
         conn.execute("DELETE FROM campaigns")
-        for c in found:
-            cid = _campaign_id(c["rule"], c["evidence"])
+        for c in merged:
+            cid = _campaign_id("MERGED", c["root_session"])
             conn.execute("INSERT INTO campaigns VALUES (?,?,?,?,?)",
-                         (cid, c["rule"], c["confidence"], c["evidence"], c["reason"]))
+                         (cid, ",".join(c["rules"]), c["confidence"],
+                          " | ".join(c["evidence"]), " | ".join(c["reasons"])))
             for sid in c["sessions"]:
                 conn.execute("INSERT INTO campaign_sessions VALUES (?,?,?)",
                              (cid, sid, ip_of[sid]))
-    return len(found)
+    return len(merged)
