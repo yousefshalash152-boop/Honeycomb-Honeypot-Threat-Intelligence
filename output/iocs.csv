@@ -1,0 +1,4 @@
+type,value,first_seen,last_seen,sources,confidence
+ip,1.2.3.4,2026-10-12T10:05:00+00:00,2026-10-12T10:05:20+00:00,Cowrie,unknown
+sha256,9f2c1d0a5b7e4c3f8a6d2b1e0c9f8a7b6d5e4c3b2a1f0e9d8c7b6a5f4e3d2c1b,2026-10-12T10:05:20+00:00,2026-10-12T10:05:20+00:00,Cowrie,unknown
+url,http://198.51.100.9/x.sh,2026-10-12T10:05:20+00:00,2026-10-12T10:05:20+00:00,Cowrie,unknown

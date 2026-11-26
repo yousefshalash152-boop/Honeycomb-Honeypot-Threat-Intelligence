@@ -141,6 +141,7 @@ def _add_virustotal_result(result, db_path):
         )
 
 
+
 def inspect_downloads(db_path, files_dir=None):
     """
     Extract Cowrie file-download events and inspect matching files.
@@ -168,14 +169,24 @@ def inspect_downloads(db_path, files_dir=None):
     for row in rows:
         try:
             event = json.loads(row["raw_json"] or "{}")
+            if not isinstance(event, dict):
+                event = {}
         except (json.JSONDecodeError, TypeError):
             event = {}
 
         raw_filename = event.get("outfile")
 
+        normalized_filename = (
+            raw_filename.replace("\\", "/")
+            if isinstance(raw_filename, str)
+            else ""
+        )
+
+        unsafe_filename = ".." in normalized_filename.split("/")
+
         filename = (
-            Path(raw_filename.replace("\\", "/")).name
-            if isinstance(raw_filename, str) and raw_filename.strip()
+            Path(normalized_filename).name
+            if normalized_filename.strip()
             else None
         )
 
@@ -209,17 +220,25 @@ def inspect_downloads(db_path, files_dir=None):
         if root is not None:
             if not filename:
                 result["file_status"] = "invalid_filename"
+
+            elif unsafe_filename:
+                result["file_status"] = "unsafe_path"
+
             else:
                 candidate = root / filename
 
                 try:
                     if candidate.is_symlink():
                         result["file_status"] = "unsafe_path"
+
                     else:
-                        resolved = candidate.resolve(strict=True)
+                        resolved = candidate.resolve(strict=False)
 
                         if not resolved.is_relative_to(root):
                             result["file_status"] = "unsafe_path"
+
+                        elif not resolved.exists():
+                            result["file_status"] = "missing"
 
                         elif not resolved.is_file():
                             result["file_status"] = "not_a_file"
