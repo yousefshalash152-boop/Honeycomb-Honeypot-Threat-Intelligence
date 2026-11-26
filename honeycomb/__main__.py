@@ -1,4 +1,4 @@
-﻿"""Entry point for the Honeycomb pipeline and CLI commands."""
+"""Entry point for the Honeycomb pipeline and CLI commands."""
 import argparse
 import os
 

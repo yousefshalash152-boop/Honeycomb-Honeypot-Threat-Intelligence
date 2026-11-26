@@ -5,42 +5,31 @@ import sqlite3
 from pathlib import Path
 
 from honeycomb.src.analysis.ioc_extractor import extract_iocs
+from honeycomb.src.scoring import load_whitelist
 
 
 FIELDS = ["type", "value", "first_seen", "last_seen", "sources", "confidence"]
 
 
-def _team_ips():
-    path = Path(__file__).resolve().parents[3] / "config" / "whitelist.yaml"
-    if not path.exists():
-        return set()
-
-    text = path.read_text(encoding="utf-8")
-    values = []
-    in_list = False
-
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("whitelist:"):
-            in_list = True
-            inline = stripped.partition(":")[2].strip()
-            if inline.startswith("[") and inline.endswith("]"):
-                values.extend(inline[1:-1].split(","))
-            continue
-        if in_list:
-            if stripped.startswith("-"):
-                values.append(stripped[1:].strip())
-            elif stripped and not stripped.startswith("#"):
-                in_list = False
-
-    result = set()
-    for value in values:
-        value = value.strip().strip("'\"")
+def _team_networks():
+    nets = []
+    for entry in load_whitelist():
         try:
-            result.add(str(ipaddress.ip_address(value)))
+            nets.append(
+                ipaddress.ip_network(str(entry).strip(), strict=False)
+            )
         except ValueError:
-            pass
-    return result
+            continue
+    return nets
+
+
+def _is_team_ip(value, nets):
+    try:
+        addr = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+
+    return any(addr in network for network in nets)
 
 
 def _hash_status(response):
@@ -85,9 +74,10 @@ def _hash_status(response):
 
     return "unknown"
 
+
 def export_iocs_csv(db_path: str, output_path: str) -> int:
     indicators = extract_iocs(db_path)
-    team_ips = _team_ips()
+    team_networks = _team_networks()
 
     with sqlite3.connect(db_path) as conn:
         timestamps = {}
@@ -106,6 +96,7 @@ def export_iocs_csv(db_path: str, output_path: str) -> int:
             response = json.loads(response_text)
         except (ValueError, TypeError):
             response = {}
+
         cache_by_indicator.setdefault(indicator, []).append(
             (source, response)
         )
@@ -122,7 +113,7 @@ def export_iocs_csv(db_path: str, output_path: str) -> int:
             kind = item["type"]
             value = item["value"]
 
-            if kind == "ip" and value in team_ips:
+            if kind == "ip" and _is_team_ip(value, team_networks):
                 continue
 
             event_times = [

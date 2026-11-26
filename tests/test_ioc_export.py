@@ -1,8 +1,11 @@
-﻿import csv
+
+import csv
 import sqlite3
 
+from honeycomb.src.analysis import ioc_export
 from honeycomb.src.analysis.ioc_export import export_iocs_csv
 from honeycomb.src.storage.schema import init_db
+from honeycomb.src import scoring
 
 
 EXPECTED_FIELDS = [
@@ -82,6 +85,45 @@ def test_export_empty_database(tmp_path):
         reader = csv.DictReader(file)
         assert reader.fieldnames == EXPECTED_FIELDS
         assert list(reader) == []
+
+
+def test_export_excludes_commented_team_ip_and_cidr(tmp_path, monkeypatch):
+    db_path = str(tmp_path / "team_ips.db")
+    output_path = tmp_path / "team_iocs.csv"
+    whitelist_path = tmp_path / "whitelist.yaml"
+
+    whitelist_path.write_text(
+        "whitelist:\n"
+        "  - 203.0.113.10 # teammate\n"
+        '  - "198.51.100.5"\n'
+        "  - 10.9.0.0/24\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(scoring, "WHITELIST_PATH", whitelist_path)
+
+    with sqlite3.connect(db_path) as conn:
+        init_db(conn)
+
+    monkeypatch.setattr(
+        ioc_export,
+        "extract_iocs",
+        lambda _db_path: [
+            {"type": "ip", "value": "203.0.113.10", "event_ids": []},
+            {"type": "ip", "value": "198.51.100.5", "event_ids": []},
+            {"type": "ip", "value": "10.9.0.25", "event_ids": []},
+            {"type": "ip", "value": "8.8.8.8", "event_ids": []},
+        ],
+    )
+
+    count = export_iocs_csv(db_path, str(output_path))
+
+    assert count == 1
+
+    with output_path.open("r", newline="", encoding="utf-8") as file:
+        rows = list(csv.DictReader(file))
+
+    assert [row["value"] for row in rows] == ["8.8.8.8"]
 
 
 def test_hash_status_classification():

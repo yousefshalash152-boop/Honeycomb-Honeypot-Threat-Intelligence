@@ -70,7 +70,19 @@ The CSV includes the following fields:
 - `sources`
 - `confidence`
 
-All three reviewed indicators currently have `unknown` confidence.
+### Confidence Field Interpretation
+
+The `confidence` column is stored as text, and its meaning depends on the IOC type and the available threat intelligence source:
+
+- **IP addresses:** The field may contain the numeric AbuseIPDB Abuse Confidence Score, represented as text.
+- **SHA-256 hashes:** The field contains the VirusTotal classification: `malicious`, `clean`, or `unknown`.
+- **URLs and other IOC types:** The field is `unknown` when no supported reputation value is available.
+
+These values are source-specific and must not be interpreted as a single normalized score or directly compared across different IOC types.
+
+The value `unknown` means that no valid or sufficient reputation result is available. It does not mean that the indicator is harmless or clean.
+
+All three indicators in the reviewed export currently have `unknown` confidence.
 
 A fresh export from `test_iocs.db` was compared with the existing CSV, and no differences were found.
 
@@ -105,7 +117,3 @@ The following steps remain before final acceptance:
 
 1. Recalculate all metrics using the operational database when it becomes available.
 2. Confirm the final IOC list against the latest operational dataset.
-3. Submit the SQL queries and report metrics to Member 5 for independent verification.
-4. Complete the cross-member review of five AI-generated statements after Member 4 provides the validation dataset.
-
-The AI validation review is a coordination task and does not block the completion of Member 3's independent implementation work.
