@@ -48,4 +48,16 @@ def test_cli_with_input_runs_the_real_steps(tmp_path):
         capture_output=True, text=True, cwd=ROOT)
     assert result.returncode == 0
     assert "[8] score: 6 IPs" in result.stdout
-    assert "[9] decide: not implemented yet" in result.stdout
+    assert "[9] decide: use  python -m honeycomb approve" in result.stdout
+
+
+def test_campaign_members_get_plus_10(tmp_path):
+    """Scoring v2: S3 and S4 share a downloaded file, so both get +10."""
+    results = run_pipeline(str(_all_scenarios(tmp_path)), str(tmp_path / "t.db"),
+                           enrich=False, out=lambda *_: None)
+    by_ip = {r["ip"]: r for r in results}
+    for ip in ("192.0.2.21", "192.0.2.88"):
+        assert by_ip[ip]["score"] == 55
+        assert any(e["reason"].startswith("campaign_member") and e["points"] == 10
+                   for e in by_ip[ip]["evidence"])
+    assert by_ip["198.51.100.7"]["score"] == 45  # S2: no campaign, no bonus
