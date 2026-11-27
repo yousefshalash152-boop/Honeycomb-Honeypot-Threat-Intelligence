@@ -1,18 +1,19 @@
-# Honeycomb
+# Wazuh SIEM Integration with Cowrie Honeypot
 
-A honeypot that turns real attacks into evidence-based block decisions, approved by a human analyst.
+## Overview
+This section covers the integration of Cowrie Honeypot with Wazuh SIEM using Docker containers on WSL 2 to monitor, detect, and visualize unauthorized SSH/Telnet security incidents.
 
-## Quick start
+## Key Configurations
+- **Log Path:** `/var/ossec/logs/cowrie/cowrie.json` (Direct ingestion from live JSON output to prevent log duplication).
+- **Custom Detection Rules:** Integrated custom security rules via `honeycomb_rules.xml`.
+- **Environment:** Containerized deployment using Docker Compose.
 
-    python -m venv .venv
-    source .venv/Scripts/activate      # macOS/Linux: source .venv/bin/activate
-    pip install -r requirements.txt pytest
-    cp .env.example .env               # put your API keys in .env only
-    python -m pytest
+## Verification & Attack Simulation
+Simulated multiple unauthorized login attempts and brute-force events to test detection logic:
+1. Triggered authentication failures over SSH/Telnet ports.
+2. Verified live alert generation in **Wazuh Dashboard** under **Threat Intelligence / Events**.
+3. Captured severity-level distributions and rule trigger alerts.
 
-## Team rules
-- Every change goes through a branch, a Pull Request, and a review by another member. No direct pushes to main.
-- Never commit: API keys, real logs, PCAPs, databases, or malware.
-- Changes to the event contract (contracts/event.md) must be approved by Member 2 and announced to the team.
-- Changes to scoring or the whitelist go in a separate PR.
-- Daily 10-minute standup in the team chat: what I did, what I will do, what I am blocked on.
+## Repository Structure
+- `honeycomb_rules.xml`: Custom Wazuh rules for Cowrie event parsing.
+- `screenshots/`: Dashboard evidence of simulated threats and alerts.
