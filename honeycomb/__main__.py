@@ -4,6 +4,7 @@
     python -m honeycomb run --input LOG.jsonl --db X.db  (steps 3-8 on real data)
     python -m honeycomb verify 203.0.113.45              (is this IP really blocked?)
     python -m honeycomb approve 203.0.113.45 --by NAME --reason "TEXT" --db X.db
+    python -m honeycomb export-iocs --db X.db --output iocs.csv
 """
 import argparse
 import os
@@ -66,8 +67,8 @@ def _approve(args) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="honeycomb")
-    parser.add_argument("command", choices=["run", "verify", "approve"],
-                        help="run the pipeline, verify a block, or approve a block")
+    parser.add_argument("command", choices=["run", "verify", "approve", "export-iocs"],
+                        help="run the pipeline, verify a block, approve a block, or export IOCs")
     parser.add_argument("ip", nargs="?", help="IP to check (verify only)")
     parser.add_argument("--by", help="approver's name (approve only, required)")
     parser.add_argument("--reason", help="why the block is approved (approve only, required)")
@@ -84,12 +85,20 @@ def main() -> int:
                         help="restricted ssh private key for verify")
     parser.add_argument("--port", type=int, default=22,
                         help="ssh port of the blocking host for verify")
+    parser.add_argument("--output", help="CSV output path (export-iocs only, required)")
     args = parser.parse_args()
 
     if args.command == "verify":
         return _verify(args)
     if args.command == "approve":
         return _approve(args)
+    if args.command == "export-iocs":
+        if not args.output:
+            parser.error("export-iocs requires --output")
+        from honeycomb.src.analysis.ioc_export import export_iocs_csv
+        count = export_iocs_csv(args.db, args.output)
+        print(f"Exported {count} IOCs to {args.output}")
+        return 0
 
     if not args.input:
         for number, step in enumerate(STEPS, start=3):
