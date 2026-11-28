@@ -245,3 +245,88 @@ def test_hash_mismatch_uses_actual_file_hash(tmp_path, monkeypatch):
     assert results[0]["hash_matches"] is False
     assert results[0]["vt_hash"] == actual_hash
     assert checked_hashes == [actual_hash]
+
+def test_virustotal_unknown_with_error(tmp_path, monkeypatch):
+    db_path = tmp_path / "test.db"
+    logged_hash = "b" * 64
+
+    create_download_event(db_path, "test.sh", logged_hash)
+
+    monkeypatch.setattr(
+        file_inspector,
+        "check_virustotal",
+        lambda *args, **kwargs: {
+            "source": "VirusTotal",
+            "found": None,
+            "error": "VirusTotal API unavailable",
+        },
+    )
+
+    results = inspect_downloads(db_path)
+
+    assert results[0]["vt_status"] == "unknown"
+    assert results[0]["vt_error"] == "VirusTotal API unavailable"
+
+
+def test_virustotal_unknown_without_error(tmp_path, monkeypatch):
+    db_path = tmp_path / "test.db"
+    logged_hash = "c" * 64
+
+    create_download_event(db_path, "test.sh", logged_hash)
+
+    monkeypatch.setattr(
+        file_inspector,
+        "check_virustotal",
+        lambda *args, **kwargs: {
+            "source": "VirusTotal",
+            "found": None,
+        },
+    )
+
+    results = inspect_downloads(db_path)
+
+    assert results[0]["vt_status"] == "unknown"
+    assert results[0]["vt_error"] == "VirusTotal result unavailable"
+
+def test_reject_symlink(tmp_path, monkeypatch):
+    db_path = tmp_path / "test.db"
+    files_dir = tmp_path / "downloads"
+    files_dir.mkdir()
+
+    real_file = files_dir / "real.sh"
+    real_file.write_text("#!/bin/sh\necho safe", encoding="utf-8")
+
+    link_file = files_dir / "linked.sh"
+
+    try:
+        link_file.symlink_to(real_file)
+    except (OSError, NotImplementedError):
+        import pytest
+        pytest.skip("Symlink creation is not supported")
+
+    content_hash = hashlib.sha256(
+        real_file.read_bytes()
+    ).hexdigest()
+
+    create_download_event(db_path, "linked.sh", content_hash)
+
+    results = inspect_downloads(db_path, files_dir=files_dir)
+
+    assert results[0]["file_status"] == "unsafe_path"
+def test_reject_path_traversal(tmp_path):
+    db_path = tmp_path / "test.db"
+    files_dir = tmp_path / "downloads"
+    files_dir.mkdir()
+
+    outside_file = tmp_path / "outside.sh"
+    outside_file.write_text("safe test file", encoding="utf-8")
+
+    create_download_event(
+        db_path,
+        "../outside.sh",
+        hashlib.sha256(outside_file.read_bytes()).hexdigest(),
+    )
+
+    results = inspect_downloads(db_path, files_dir=files_dir)
+
+    assert results[0]["file_status"] == "unsafe_path"
