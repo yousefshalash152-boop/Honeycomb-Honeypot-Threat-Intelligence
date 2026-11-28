@@ -1,10 +1,15 @@
-"""Entry point for the Honeycomb pipeline and CLI commands."""
+"""Entry point for the whole pipeline.
+
+    python -m honeycomb run                              (steps listed, none run)
+    python -m honeycomb run --input LOG.jsonl --db X.db  (steps 3-8 on real data)
+    python -m honeycomb verify 203.0.113.45              (is this IP really blocked?)
+    python -m honeycomb approve 203.0.113.45 --by NAME --reason "TEXT" --db X.db
+    python -m honeycomb export-iocs --db X.db --output iocs.csv
+"""
 import argparse
 import os
 
-from honeycomb.src.analysis.ioc_export import export_iocs_csv
-
-# Pipeline steps 3-10 from the project plan.
+# Pipeline steps 3-10 from the project plan (steps 1-2 run on the server).
 STEPS = [
     "normalize",
     "extract_iocs",
@@ -28,81 +33,72 @@ def _verify(args) -> int:
     if not args.ip:
         print("verify needs an IP:  python -m honeycomb verify <IP>")
         return 2
-
     try:
-        result = verify_ip(
-            args.ip,
-            host=args.host,
-            key=args.key,
-            user=args.user,
-            port=args.port,
-        )
+        result = verify_ip(args.ip, host=args.host, key=args.key,
+                           user=args.user, port=args.port)
     except (ValueError, BlockingError) as exc:
         print(f"ERROR: {exc}")
         return 2
-
     if not result["blocked"]:
         print(f"{result['ip']}  NOT BLOCKED")
         return 1
-
-    print(
-        f"{result['ip']}  BLOCKED  packets={result['packets']} "
-        f"bytes={result['bytes']}  expires in {_duration(result['expires_in'])}"
-    )
+    print(f"{result['ip']}  BLOCKED  packets={result['packets']} "
+          f"bytes={result['bytes']}  expires in {_duration(result['expires_in'])}")
     return 0
+
+
+def _approve(args) -> int:
+    from honeycomb.src.decisions import ApproveRefused, approve
+    if not args.ip:
+        print('approve needs an IP:  python -m honeycomb approve <IP> --by NAME --reason "TEXT"')
+        return 2
+    try:
+        d = approve(args.db, args.ip, args.by, args.reason, enrich=not args.no_enrich,
+                    host=args.host, key=args.key, user=args.user, port=args.port)
+    except ApproveRefused as exc:
+        print(exc)
+        return 1
+    print(f"APPROVED {d['ip']}  score={d['score']}  by={d['approved_by']}  "
+          f"decision={d['decision_id']}")
+    print(f"  reason: {d['reason']}")
+    print(f"  block:  {d['block_result']}")
+    return 0 if d["block_result"] == "blocked" else 1
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="honeycomb")
-
-    parser.add_argument(
-        "command",
-        choices=["run", "verify", "export-iocs"],
-        help="run the pipeline, verify a blocked IP, or export IOCs",
-    )
+    parser.add_argument("command", choices=["run", "verify", "approve", "export-iocs"],
+                        help="run the pipeline, verify a block, approve a block, or export IOCs")
     parser.add_argument("ip", nargs="?", help="IP to check (verify only)")
-
+    parser.add_argument("--by", help="approver's name (approve only, required)")
+    parser.add_argument("--reason", help="why the block is approved (approve only, required)")
     parser.add_argument("--input", help="Cowrie JSON-lines log file to process")
-    parser.add_argument(
-        "--db",
-        help="SQLite database path",
-    )
-    parser.add_argument(
-        "--no-enrich",
-        action="store_true",
-        help="skip AbuseIPDB / VirusTotal lookups",
-    )
-
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--user", default="honeycomb-blocker")
-    parser.add_argument(
-        "--key",
-        default=os.path.expanduser("~/.ssh/honeycomb_blocker"),
-    )
-    parser.add_argument("--port", type=int, default=22)
-
-    parser.add_argument(
-        "--output",
-        help="CSV output path (required for export-iocs)",
-    )
-
+    parser.add_argument("--db", default="data/honeycomb.db",
+                        help="SQLite database path (default: data/honeycomb.db)")
+    parser.add_argument("--no-enrich", action="store_true",
+                        help="skip AbuseIPDB / VirusTotal lookups")
+    parser.add_argument("--host", default="127.0.0.1",
+                        help="blocking host for verify (default: 127.0.0.1)")
+    parser.add_argument("--user", default="honeycomb-blocker",
+                        help="restricted ssh user for verify")
+    parser.add_argument("--key", default=os.path.expanduser("~/.ssh/honeycomb_blocker"),
+                        help="restricted ssh private key for verify")
+    parser.add_argument("--port", type=int, default=22,
+                        help="ssh port of the blocking host for verify")
+    parser.add_argument("--output", help="CSV output path (export-iocs only, required)")
     args = parser.parse_args()
 
     if args.command == "verify":
         return _verify(args)
-
+    if args.command == "approve":
+        return _approve(args)
     if args.command == "export-iocs":
-        if not args.db:
-            parser.error("export-iocs requires --db")
         if not args.output:
             parser.error("export-iocs requires --output")
-
+        from honeycomb.src.analysis.ioc_export import export_iocs_csv
         count = export_iocs_csv(args.db, args.output)
         print(f"Exported {count} IOCs to {args.output}")
         return 0
-
-    # Run command
-    db_path = args.db or "data/honeycomb.db"
 
     if not args.input:
         for number, step in enumerate(STEPS, start=3):
@@ -110,10 +106,11 @@ def main() -> int:
         return 0
 
     from pathlib import Path
+
     from honeycomb.src.pipeline import run_pipeline
 
-    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-    run_pipeline(args.input, db_path, enrich=not args.no_enrich)
+    Path(args.db).parent.mkdir(parents=True, exist_ok=True)
+    run_pipeline(args.input, args.db, enrich=not args.no_enrich)
     return 0
 
 

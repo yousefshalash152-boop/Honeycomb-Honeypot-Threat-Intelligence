@@ -104,14 +104,16 @@ The Cowrie container has no `cat` or `ls`. Do not run `docker exec ... cat`. To 
 
 ```bash
 scripts/pull_logs.sh local
-jq -c '{eventid, session, input}' data/raw/cowrie-*.json | head
+jq -c '{eventid, session, input}' data/raw/cowrie.json | head
 ```
 
 For a real VM: `scripts/pull_logs.sh <VM_IP> <ADMIN_PORT> <ADMIN_USER>`.
 
+The script keeps ONE append-only file, `data/raw/cowrie.json`. Each run adds only the events it has not seen yet (no duplicates), so it is safe to run as often as needed. Run it with `SNAPSHOT=1` to also keep a timestamped copy of that pull.
+
 ## 9. Hourly log pull (cron)
 
-Pull the Cowrie log into `data/raw/` automatically every hour (Linux). `data/` is gitignored.
+Pull the Cowrie log into `data/raw/cowrie.json` automatically every hour (Linux). `data/` is gitignored.
 
 ```bash
 sudo systemctl enable --now cron
@@ -121,6 +123,6 @@ crontab -l
 
 For the real VM replace `local` with `<VM_IP> <ADMIN_PORT> <ADMIN_USER>` (needs an SSH key without passphrase, since cron has no agent).
 
-Check: `ls data/raw/` and `tail data/pull.log`. To test quickly, change `0 * * * *` to `* * * * *` (every minute), then change it back.
+Check: `wc -l data/raw/cowrie.json` and `tail data/pull.log`. To test quickly, change `0 * * * *` to `* * * * *` (every minute), then change it back.
 
 Remove: `crontab -l | grep -v pull_logs.sh | crontab -`
